@@ -62,38 +62,38 @@ def procesar_excel(ruta_excel: str, malla: dict) -> tuple[list[dict], set[str]]:
     Cruza con la malla curricular para determinar semestres.
     Retorna (registros, materias_no_encontradas).
     """
-    xls = pd.ExcelFile(ruta_excel)
     registros = []
     materias_no_encontradas = set()
 
-    for sheet_name in xls.sheet_names:
-        df = pd.read_excel(xls, sheet_name=sheet_name, header=None)
-        datos = parsear_hoja(df)
-        if datos is None:
-            continue
+    with pd.ExcelFile(ruta_excel) as xls:
+        for sheet_name in xls.sheet_names:
+            df = pd.read_excel(xls, sheet_name=sheet_name, header=None)
+            datos = parsear_hoja(df)
+            if datos is None:
+                continue
 
-        codigo = datos["codigo_materia"]
-        info_malla = malla.get(codigo)
+            codigo = datos["codigo_materia"]
+            info_malla = malla.get(codigo)
 
-        # Intentar corrección SPC -> SCP
-        if info_malla is None:
-            codigo_alt = codigo.replace("SPC-", "SCP-")
-            info_malla = malla.get(codigo_alt)
+            # Intentar corrección SPC -> SCP
+            if info_malla is None:
+                codigo_alt = codigo.replace("SPC-", "SCP-")
+                info_malla = malla.get(codigo_alt)
+                if info_malla:
+                    codigo = codigo_alt
+                    datos["codigo_materia"] = codigo
+
             if info_malla:
-                codigo = codigo_alt
-                datos["codigo_materia"] = codigo
+                datos["semestre"] = info_malla["semestre"]
+                datos["nombre_malla"] = info_malla["nombre_malla"]
+                datos["creditos"] = info_malla["creditos"]
+            else:
+                datos["semestre"] = None
+                datos["nombre_malla"] = None
+                datos["creditos"] = None
+                materias_no_encontradas.add(datos["codigo_materia"])
 
-        if info_malla:
-            datos["semestre"] = info_malla["semestre"]
-            datos["nombre_malla"] = info_malla["nombre_malla"]
-            datos["creditos"] = info_malla["creditos"]
-        else:
-            datos["semestre"] = None
-            datos["nombre_malla"] = None
-            datos["creditos"] = None
-            materias_no_encontradas.add(datos["codigo_materia"])
-
-        datos["hoja"] = sheet_name
-        registros.append(datos)
+            datos["hoja"] = sheet_name
+            registros.append(datos)
 
     return registros, materias_no_encontradas

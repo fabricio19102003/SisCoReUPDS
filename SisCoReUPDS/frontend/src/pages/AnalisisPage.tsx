@@ -149,9 +149,11 @@ function AnalisisDetalle({ id }: { id: number }) {
     )
   }
 
-  const { analisis, semestres, grupos } = data
+  const analisis = data.resumen
+  const semestres = data.detalle_semestres
+  const grupos = data.detalle_grupos
 
-  const chartData = semestres
+  const chartData = [...semestres]
     .sort((a, b) => a.semestre - b.semestre)
     .map((s) => ({
       semestre: `Sem ${s.semestre}`,
@@ -302,7 +304,7 @@ function AnalisisDetalle({ id }: { id: number }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-upds-fog/60">
-              {semestres
+              {[...semestres]
                 .sort((a, b) => a.semestre - b.semestre)
                 .map((s) => (
                   <tr key={s.semestre} className="hover:bg-upds-celeste-ghost/30 transition-colors">
@@ -346,10 +348,10 @@ function AnalisisDetalle({ id }: { id: number }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-upds-fog/60">
-              {grupos
+              {[...grupos]
                 .sort((a, b) => a.semestre - b.semestre || a.nombre_grupo.localeCompare(b.nombre_grupo))
-                .map((g) => (
-                  <tr key={g.id} className="hover:bg-upds-celeste-ghost/30 transition-colors">
+                .map((g, i) => (
+                  <tr key={`${g.semestre}-${g.nombre_grupo}-${i}`} className="hover:bg-upds-celeste-ghost/30 transition-colors">
                     <td className="px-6 py-3 text-xs text-upds-steel tabular-nums">Sem {g.semestre}</td>
                     <td className="px-6 py-3">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-upds-celeste-pale text-upds-navy-mid text-xs font-semibold">

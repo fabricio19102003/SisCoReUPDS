@@ -60,28 +60,24 @@ export interface Analisis {
 }
 
 export interface DetalleSemestre {
-  id: number
-  analisis_id: number
   semestre: number
   unicos: number
   regulares: number
   repitentes: number
+  porcentaje_repitentes: number
 }
 
 export interface DetalleGrupo {
-  id: number
-  analisis_id: number
   semestre: number
   nombre_grupo: string
   turno: string
   matriculados: number
   repitentes_count: number
+  regulares: number
   letras_desglose: Record<string, number>
 }
 
 export interface Repitente {
-  id: number
-  analisis_id: number
   estudiante_id: string
   nombre: string
   semestre_principal: number
@@ -90,9 +86,9 @@ export interface Repitente {
 }
 
 export interface AnalisisCompleto {
-  analisis: Analisis
-  semestres: DetalleSemestre[]
-  grupos: DetalleGrupo[]
+  resumen: Analisis
+  detalle_semestres: DetalleSemestre[]
+  detalle_grupos: DetalleGrupo[]
   repitentes: Repitente[]
 }
 

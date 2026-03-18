@@ -172,7 +172,7 @@ export default function RepitentesPage() {
                 </thead>
                 <tbody className="divide-y divide-upds-fog/60">
                   {repitentes.map((r) => (
-                    <tr key={r.id} className="hover:bg-upds-celeste-ghost/30 transition-colors">
+                    <tr key={r.estudiante_id} className="hover:bg-upds-celeste-ghost/30 transition-colors">
                       <td className="px-6 py-3.5">
                         <span className="font-mono text-xs text-upds-graphite bg-upds-fog/60 px-2 py-0.5 rounded">
                           {r.estudiante_id}
