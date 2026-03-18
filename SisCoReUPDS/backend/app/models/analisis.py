@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, JSON, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text
+from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -11,11 +12,11 @@ class Analisis(Base):
     id = Column(Integer, primary_key=True, index=True)
     periodo_id = Column(Integer, ForeignKey("periodos.id"), nullable=False)
     fecha_analisis = Column(DateTime, default=datetime.utcnow)
-    archivo_nombre = Column(String(255), nullable=False)
+    archivo_nombre = Column(Text, nullable=False)
     total_unicos = Column(Integer, default=0)
     total_repitentes = Column(Integer, default=0)
-    materias_no_encontradas = Column(JSON, default=[])
-    datos_completos = Column(JSON, default={})
+    materias_no_encontradas = Column(JSON, nullable=True)
+    datos_completos = Column(JSON, nullable=True)
 
     periodo = relationship("Periodo", back_populates="analisis")
     detalle_semestres = relationship("AnalisisDetalleSemestre", back_populates="analisis", cascade="all, delete-orphan")
@@ -42,11 +43,11 @@ class AnalisisDetalleGrupo(Base):
     id = Column(Integer, primary_key=True, index=True)
     analisis_id = Column(Integer, ForeignKey("analisis.id"), nullable=False)
     semestre = Column(Integer, nullable=False)
-    nombre_grupo = Column(String(10), nullable=False)
-    turno = Column(String(20), nullable=False)
+    nombre_grupo = Column(Text, nullable=False)
+    turno = Column(Text, nullable=False)
     matriculados = Column(Integer, default=0)
     repitentes_count = Column(Integer, default=0)
-    letras_desglose = Column(JSON, default={})
+    letras_desglose = Column(JSON, nullable=True)
 
     analisis = relationship("Analisis", back_populates="detalle_grupos")
 
@@ -56,10 +57,10 @@ class Repitente(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     analisis_id = Column(Integer, ForeignKey("analisis.id"), nullable=False)
-    estudiante_id = Column(String(50), nullable=False)
-    nombre = Column(String(200), nullable=False)
+    estudiante_id = Column(Text, nullable=False)
+    nombre = Column(Text, nullable=False)
     semestre_principal = Column(Integer, nullable=False)
-    semestres_donde_repite = Column(JSON, default=[])
-    todos_los_semestres = Column(JSON, default=[])
+    semestres_donde_repite = Column(JSON, nullable=True)
+    todos_los_semestres = Column(JSON, nullable=True)
 
     analisis = relationship("Analisis", back_populates="repitentes")

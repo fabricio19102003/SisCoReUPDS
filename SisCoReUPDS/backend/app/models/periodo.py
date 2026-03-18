@@ -9,7 +9,7 @@ class Periodo(Base):
     __tablename__ = "periodos"
 
     id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(20), nullable=False, unique=True)  # ej: "1/2026"
+    nombre = Column(String(50), nullable=False, unique=True)
     fecha_inicio = Column(DateTime, nullable=True)
     fecha_fin = Column(DateTime, nullable=True)
     activo = Column(Boolean, default=True)

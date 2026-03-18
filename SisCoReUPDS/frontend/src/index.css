@@ -1,0 +1,112 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* UPDS Institutional Palette */
+  --color-upds-navy: #0f1d42;
+  --color-upds-navy-light: #1a2b5f;
+  --color-upds-navy-mid: #243a7a;
+  --color-upds-celeste: #4a90d9;
+  --color-upds-celeste-light: #6bb0f0;
+  --color-upds-celeste-pale: #e8f2fc;
+  --color-upds-celeste-ghost: #f3f8fe;
+  --color-upds-white: #ffffff;
+  --color-upds-ice: #f7f9fc;
+  --color-upds-fog: #edf1f7;
+  --color-upds-steel: #94a3b8;
+  --color-upds-graphite: #475569;
+  --color-upds-ink: #1e293b;
+
+  /* Accent colors for charts and badges */
+  --color-accent-amber: #f59e0b;
+  --color-accent-amber-pale: #fef3c7;
+  --color-accent-emerald: #10b981;
+  --color-accent-emerald-pale: #d1fae5;
+  --color-accent-rose: #f43f5e;
+  --color-accent-rose-pale: #ffe4e6;
+  --color-accent-violet: #8b5cf6;
+  --color-accent-violet-pale: #ede9fe;
+
+  /* Typography */
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Shadows */
+  --shadow-card: 0 1px 3px rgba(15, 29, 66, 0.04), 0 1px 2px rgba(15, 29, 66, 0.06);
+  --shadow-card-hover: 0 4px 12px rgba(15, 29, 66, 0.08), 0 2px 4px rgba(15, 29, 66, 0.04);
+  --shadow-elevated: 0 8px 30px rgba(15, 29, 66, 0.1), 0 2px 8px rgba(15, 29, 66, 0.04);
+  --shadow-sidebar: 4px 0 24px rgba(15, 29, 66, 0.15);
+}
+
+/* Base Styles */
+body {
+  margin: 0;
+  background: var(--color-upds-ice);
+  color: var(--color-upds-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-upds-steel);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-upds-graphite);
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s ease-out forwards;
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.35s ease-out forwards;
+}
+
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+
+/* Selection */
+::selection {
+  background: var(--color-upds-celeste);
+  color: white;
+}

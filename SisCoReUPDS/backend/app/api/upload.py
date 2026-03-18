@@ -1,6 +1,9 @@
 import os
+import logging
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from app.config import settings
 from app.db.database import get_db
@@ -144,6 +147,12 @@ async def subir_y_analizar(
             "semestres_detectados": sorted(stats["estudiantes_por_semestre"].keys()),
         }
 
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.exception("Error procesando archivo Excel")
+        raise HTTPException(status_code=500, detail=f"Error interno al procesar: {type(e).__name__}: {str(e)}")
     finally:
         # Limpiar archivo temporal
         if os.path.exists(ruta_archivo):
