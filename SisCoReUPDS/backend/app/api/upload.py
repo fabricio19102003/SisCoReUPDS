@@ -134,6 +134,36 @@ async def subir_y_analizar(
             )
             db.add(repitente)
 
+        # Guardar listas de estudiantes por grupo para impresión de listas
+        estudiantes_por_grupo = {}
+        for r in registros:
+            if r["semestre"] is None:
+                continue
+            sem = r["semestre"]
+            letra = r["letra_grupo"]
+            if sem in configs_grupos:
+                letra_a_grupo_map, _, _ = configs_grupos[sem]
+            else:
+                letra_a_grupo_map = {}
+            grupo_real = letra_a_grupo_map.get(letra, letra)
+            key = f"{sem}_{grupo_real}"
+            if key not in estudiantes_por_grupo:
+                estudiantes_por_grupo[key] = {"semestre": sem, "grupo": grupo_real, "estudiantes": {}}
+            for est in r["estudiantes"]:
+                estudiantes_por_grupo[key]["estudiantes"][est["id"]] = est["nombre"]
+
+        # Convertir a formato serializable (lista de estudiantes únicos por grupo)
+        datos_completos_json = []
+        for key, info in estudiantes_por_grupo.items():
+            lista_est = [{"id": eid, "nombre": nombre} for eid, nombre in sorted(info["estudiantes"].items(), key=lambda x: x[1])]
+            datos_completos_json.append({
+                "semestre": info["semestre"],
+                "grupo": info["grupo"],
+                "estudiantes": lista_est,
+            })
+        datos_completos_json.sort(key=lambda x: (x["semestre"], x["grupo"]))
+        analisis.datos_completos = datos_completos_json
+
         db.commit()
         db.refresh(analisis)
 

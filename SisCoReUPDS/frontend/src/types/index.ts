@@ -100,3 +100,38 @@ export interface UploadResponse {
   materias_no_encontradas: string[]
   semestres_detectados: number[]
 }
+
+// === Listas de estudiantes ===
+export interface EstudianteLista {
+  id: string
+  nombre: string
+}
+
+export interface ListaGrupo {
+  semestre: number
+  grupo: string
+  turno: string
+  total_estudiantes: number
+  estudiantes: EstudianteLista[]
+}
+
+export interface GrupoDisponible {
+  semestre: number
+  grupo: string
+  turno: string
+  total: number
+}
+
+export interface ListasResponse {
+  analisis_id: number
+  periodo_nombre: string | null
+  archivo_nombre: string
+  filtros_disponibles: {
+    semestres: number[]
+    turnos: string[]
+    grupos: GrupoDisponible[]
+  }
+  listas: ListaGrupo[]
+  total_grupos: number
+  total_estudiantes: number
+}

@@ -12,6 +12,7 @@ import type {
   UploadResponse,
   DetalleSemestre,
   DetalleGrupo,
+  ListasResponse,
 } from '../types'
 
 const api = axios.create({
@@ -90,6 +91,52 @@ export const exportarAnalisis = (id: number, formato: 'excel' | 'pdf') =>
     const link = document.createElement('a')
     link.href = url
     link.setAttribute('download', `reporte_analisis_${id}.${ext}`)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  })
+
+// === Exportar repitentes ===
+export const exportarRepitentes = (
+  id: number,
+  formato: 'excel' | 'pdf',
+  params?: { semestre_principal?: number; semestre_repite?: number; buscar?: string }
+) =>
+  api.get(`/analisis/${id}/repitentes/exportar`, {
+    params: { formato, ...params },
+    responseType: 'blob',
+  }).then((r) => {
+    const ext = formato === 'excel' ? 'xlsx' : 'pdf'
+    const url = window.URL.createObjectURL(new Blob([r.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `repitentes_analisis_${id}.${ext}`)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  })
+
+// === Listas de estudiantes ===
+export const getListas = (
+  id: number,
+  params?: { semestre?: number; turno?: string; grupo?: string }
+) =>
+  api.get<ListasResponse>(`/analisis/${id}/listas`, { params }).then((r) => r.data)
+
+export const imprimirListas = (
+  id: number,
+  params?: { semestre?: number; turno?: string; grupos?: string }
+) =>
+  api.get(`/analisis/${id}/listas/imprimir`, {
+    params,
+    responseType: 'blob',
+  }).then((r) => {
+    const url = window.URL.createObjectURL(new Blob([r.data], { type: 'application/pdf' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `listas_analisis_${id}.pdf`)
     document.body.appendChild(link)
     link.click()
     link.remove()

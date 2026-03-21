@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getAnalisisList, getRepitentes } from '../api/client'
+import { getAnalisisList, getRepitentes, exportarRepitentes } from '../api/client'
 import {
   Users,
   Search,
   Filter,
+  Download,
+  FileText,
 } from 'lucide-react'
 
 export default function RepitentesPage() {
@@ -132,7 +134,7 @@ export default function RepitentesPage() {
         </div>
       ) : (
         <div className="animate-fade-in-up stagger-2 bg-white rounded-2xl shadow-card border border-upds-fog/80">
-          {/* Result count */}
+          {/* Result count + export buttons */}
           <div className="px-6 py-4 border-b border-upds-fog flex justify-between items-center">
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full bg-upds-navy/[0.07] text-upds-navy text-xs font-bold tabular-nums">
@@ -140,6 +142,36 @@ export default function RepitentesPage() {
               </span>
               <span className="text-xs text-upds-steel">repitentes encontrados</span>
             </div>
+            {repitentes && repitentes.length > 0 && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() =>
+                    exportarRepitentes(analisisId as number, 'excel', {
+                      buscar: buscar || undefined,
+                      semestre_principal: semestrePrincipal || undefined,
+                      semestre_repite: semestreRepite || undefined,
+                    })
+                  }
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-accent-emerald/10 text-accent-emerald text-[11px] font-semibold rounded-lg hover:bg-accent-emerald/20 transition-colors"
+                >
+                  <Download className="w-3 h-3" />
+                  Excel
+                </button>
+                <button
+                  onClick={() =>
+                    exportarRepitentes(analisisId as number, 'pdf', {
+                      buscar: buscar || undefined,
+                      semestre_principal: semestrePrincipal || undefined,
+                      semestre_repite: semestreRepite || undefined,
+                    })
+                  }
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-accent-rose/10 text-accent-rose text-[11px] font-semibold rounded-lg hover:bg-accent-rose/20 transition-colors"
+                >
+                  <FileText className="w-3 h-3" />
+                  PDF
+                </button>
+              </div>
+            )}
           </div>
 
           {!repitentes?.length ? (

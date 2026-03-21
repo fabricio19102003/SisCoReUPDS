@@ -21,7 +21,7 @@ export default function Sidebar() {
   const location = useLocation()
 
   return (
-    <aside className="w-[272px] min-h-screen bg-upds-navy flex flex-col shadow-sidebar relative overflow-hidden">
+    <aside className="w-[272px] h-screen bg-upds-navy flex flex-col shadow-sidebar relative overflow-hidden sticky top-0">
       {/* Subtle geometric pattern overlay */}
       <div className="absolute inset-0 opacity-[0.03]"
         style={{

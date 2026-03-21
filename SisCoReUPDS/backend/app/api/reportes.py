@@ -15,7 +15,7 @@ from app.services.analizador import obtener_configs_grupos
 from app.services.malla_service import obtener_malla_dict
 from app.services.parser_excel import procesar_excel
 from app.services.analizador import generar_estadisticas
-from app.services.exportador import exportar_excel, exportar_pdf
+from app.services.exportador import exportar_excel, exportar_pdf, exportar_listas_pdf, exportar_repitentes_excel, exportar_repitentes_pdf
 
 router = APIRouter(prefix="/api/analisis", tags=["Reportes y Análisis"])
 
@@ -195,6 +195,56 @@ def obtener_repitentes(
     return resultado
 
 
+@router.get("/{analisis_id}/repitentes/exportar")
+def exportar_repitentes(
+    analisis_id: int,
+    formato: str = Query(..., regex="^(pdf|excel)$"),
+    semestre_principal: int | None = Query(None),
+    semestre_repite: int | None = Query(None),
+    buscar: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Exporta la lista de repitentes filtrada a PDF o Excel."""
+    analisis = _obtener_analisis(analisis_id, db)
+
+    query = db.query(Repitente).filter(Repitente.analisis_id == analisis_id)
+    if semestre_principal is not None:
+        query = query.filter(Repitente.semestre_principal == semestre_principal)
+
+    repitentes = query.order_by(Repitente.semestre_principal.desc(), Repitente.nombre).all()
+
+    resultado = []
+    for r in repitentes:
+        if semestre_repite is not None and semestre_repite not in (r.semestres_donde_repite or []):
+            continue
+        if buscar and buscar.lower() not in r.nombre.lower() and buscar not in r.estudiante_id:
+            continue
+        resultado.append({
+            "estudiante_id": r.estudiante_id,
+            "nombre": r.nombre,
+            "semestre_principal": r.semestre_principal,
+            "semestres_donde_repite": r.semestres_donde_repite or [],
+            "todos_los_semestres": r.todos_los_semestres or [],
+        })
+
+    periodo_nombre = analisis.periodo.nombre if analisis.periodo else "Sin período"
+
+    if formato == "excel":
+        output = exportar_repitentes_excel(resultado, periodo_nombre)
+        return StreamingResponse(
+            output,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename=Repitentes_{analisis.archivo_nombre}.xlsx"},
+        )
+    else:
+        output = exportar_repitentes_pdf(resultado, periodo_nombre)
+        return StreamingResponse(
+            output,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename=Repitentes_{analisis.archivo_nombre}.pdf"},
+        )
+
+
 @router.get("/{analisis_id}/exportar")
 def exportar_analisis(
     analisis_id: int,
@@ -269,10 +319,14 @@ def _reconstruir_stats(analisis: Analisis, db: Session) -> dict:
             repitentes_por_semestre[s].add(r.estudiante_id)
 
     # Grupos
+    grupo_repitentes_count = {}
     for dg in analisis.detalle_grupos:
         for i in range(dg.matriculados):
             fake_id = f"grp{dg.semestre}_{dg.nombre_grupo}_est{i}"
             grupo_real_semestre[(dg.semestre, dg.nombre_grupo)].add(fake_id)
+
+        # Guardar el conteo real de repitentes por grupo desde la BD
+        grupo_repitentes_count[(dg.semestre, dg.nombre_grupo)] = dg.repitentes_count
 
         for letra, count in (dg.letras_desglose or {}).items():
             for i in range(count):
@@ -283,9 +337,179 @@ def _reconstruir_stats(analisis: Analisis, db: Session) -> dict:
         "estudiantes_por_semestre": estudiantes_por_semestre,
         "grupo_real_semestre": grupo_real_semestre,
         "grupo_real_letra_semestre": grupo_real_letra_semestre,
+        "grupo_repitentes_count": grupo_repitentes_count,
         "total_estudiantes_unicos": analisis.total_unicos,
         "repitentes": repitentes_lista,
         "repitentes_por_semestre": repitentes_por_semestre,
         "est_sem_principal": est_sem_principal,
         "est_nombre": est_nombre,
     }
+
+
+# ═══════════════════════════════════════════════════════════
+#  Listas de estudiantes para impresión
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/{analisis_id}/listas")
+def obtener_listas(
+    analisis_id: int,
+    semestre: int | None = Query(None),
+    turno: str | None = Query(None, regex="^(Mañana|Tarde|Noche)$"),
+    grupo: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Retorna las listas de estudiantes por grupo, con filtros opcionales.
+    """
+    analisis = _obtener_analisis(analisis_id, db)
+
+    if not analisis.datos_completos:
+        raise HTTPException(
+            status_code=404,
+            detail="Este análisis no tiene datos de listas. Re-suba el archivo para generar las listas.",
+        )
+
+    # Cargar info de grupos para obtener turnos
+    grupos_db = (
+        db.query(AnalisisDetalleGrupo)
+        .filter(AnalisisDetalleGrupo.analisis_id == analisis_id)
+        .all()
+    )
+    turno_por_grupo = {}
+    for g in grupos_db:
+        turno_por_grupo[(g.semestre, g.nombre_grupo)] = g.turno
+
+    resultado = []
+    for entry in analisis.datos_completos:
+        sem = entry["semestre"]
+        grp = entry["grupo"]
+        turno_grp = turno_por_grupo.get((sem, grp), "?")
+
+        # Aplicar filtros
+        if semestre is not None and sem != semestre:
+            continue
+        if turno is not None and turno_grp != turno:
+            continue
+        if grupo is not None and grp != grupo:
+            continue
+
+        resultado.append({
+            "semestre": sem,
+            "grupo": grp,
+            "turno": turno_grp,
+            "total_estudiantes": len(entry["estudiantes"]),
+            "estudiantes": entry["estudiantes"],
+        })
+
+    # Info de semestres y grupos disponibles (para los filtros del frontend)
+    semestres_disponibles = sorted(set(e["semestre"] for e in analisis.datos_completos))
+    grupos_disponibles = []
+    for e in analisis.datos_completos:
+        t = turno_por_grupo.get((e["semestre"], e["grupo"]), "?")
+        grupos_disponibles.append({
+            "semestre": e["semestre"],
+            "grupo": e["grupo"],
+            "turno": t,
+            "total": len(e["estudiantes"]),
+        })
+    grupos_disponibles.sort(key=lambda x: (x["semestre"], x["grupo"]))
+    turnos_disponibles = sorted(set(
+        turno_por_grupo.get((e["semestre"], e["grupo"]), "?")
+        for e in analisis.datos_completos
+    ))
+
+    return {
+        "analisis_id": analisis_id,
+        "periodo_nombre": analisis.periodo.nombre if analisis.periodo else None,
+        "archivo_nombre": analisis.archivo_nombre,
+        "filtros_disponibles": {
+            "semestres": semestres_disponibles,
+            "turnos": turnos_disponibles,
+            "grupos": grupos_disponibles,
+        },
+        "listas": resultado,
+        "total_grupos": len(resultado),
+        "total_estudiantes": sum(len(e["estudiantes"]) for e in resultado),
+    }
+
+
+@router.get("/{analisis_id}/listas/imprimir")
+def imprimir_listas(
+    analisis_id: int,
+    semestre: int | None = Query(None),
+    turno: str | None = Query(None),
+    grupos: str | None = Query(None, description="Grupos separados por coma, ej: M1,T1,N1"),
+    db: Session = Depends(get_db),
+):
+    """
+    Genera un PDF para impresión de listas de estudiantes con filtros.
+    """
+    analisis = _obtener_analisis(analisis_id, db)
+
+    if not analisis.datos_completos:
+        raise HTTPException(
+            status_code=404,
+            detail="Este análisis no tiene datos de listas.",
+        )
+
+    # Cargar info de grupos
+    grupos_db = (
+        db.query(AnalisisDetalleGrupo)
+        .filter(AnalisisDetalleGrupo.analisis_id == analisis_id)
+        .all()
+    )
+    turno_por_grupo = {}
+    rep_count_por_grupo = {}
+    for g in grupos_db:
+        turno_por_grupo[(g.semestre, g.nombre_grupo)] = g.turno
+        rep_count_por_grupo[(g.semestre, g.nombre_grupo)] = g.repitentes_count
+
+    # Parsear lista de grupos seleccionados
+    grupos_seleccionados = None
+    if grupos:
+        grupos_seleccionados = set(g.strip() for g in grupos.split(","))
+
+    # Filtrar listas
+    listas_filtradas = []
+    for entry in analisis.datos_completos:
+        sem = entry["semestre"]
+        grp = entry["grupo"]
+        turno_grp = turno_por_grupo.get((sem, grp), "?")
+
+        if semestre is not None and sem != semestre:
+            continue
+        if turno is not None and turno_grp != turno:
+            continue
+        if grupos_seleccionados is not None and grp not in grupos_seleccionados:
+            continue
+
+        listas_filtradas.append({
+            "semestre": sem,
+            "grupo": grp,
+            "turno": turno_grp,
+            "repitentes_count": rep_count_por_grupo.get((sem, grp), 0),
+            "estudiantes": entry["estudiantes"],
+        })
+
+    if not listas_filtradas:
+        raise HTTPException(status_code=404, detail="No se encontraron listas con los filtros aplicados.")
+
+    periodo_nombre = analisis.periodo.nombre if analisis.periodo else "Sin período"
+    output = exportar_listas_pdf(listas_filtradas, periodo_nombre)
+
+    filtro_desc = []
+    if semestre is not None:
+        filtro_desc.append(f"S{semestre}")
+    if turno:
+        filtro_desc.append(turno)
+    if grupos:
+        filtro_desc.append(grupos)
+    filtro_str = "_".join(filtro_desc) if filtro_desc else "todas"
+
+    return StreamingResponse(
+        output,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=Listas_{filtro_str}_{analisis.archivo_nombre}.pdf",
+        },
+    )

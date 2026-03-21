@@ -16,6 +16,7 @@ import {
   FileSpreadsheet,
   FileText,
   AlertTriangle,
+  List,
 } from 'lucide-react'
 
 const CHART_COLORS = {
@@ -190,6 +191,13 @@ function AnalisisDetalle({ id }: { id: number }) {
           </p>
         </div>
         <div className="flex gap-2">
+          <Link
+            to={`/analisis/${id}/listas`}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-upds-navy/[0.07] text-upds-navy text-xs font-semibold rounded-xl hover:bg-upds-navy/[0.14] transition-colors"
+          >
+            <List className="w-3.5 h-3.5" />
+            Listas
+          </Link>
           <button
             onClick={() => exportarAnalisis(id, 'excel')}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-accent-emerald/10 text-accent-emerald text-xs font-semibold rounded-xl hover:bg-accent-emerald/20 transition-colors"
