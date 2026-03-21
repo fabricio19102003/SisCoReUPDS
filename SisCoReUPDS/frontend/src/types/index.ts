@@ -135,3 +135,55 @@ export interface ListasResponse {
   total_grupos: number
   total_estudiantes: number
 }
+
+// === Comparativas ===
+export interface ComparativaPeriodoResumen {
+  periodo_id: number
+  periodo_nombre: string
+  total_unicos: number
+  total_repitentes: number
+}
+
+export interface PeriodoSemestreDetalle {
+  periodo_id: number
+  periodo_nombre: string
+  unicos: number
+  regulares: number
+  repitentes: number
+}
+
+export interface ComparativaSemestreDetalle {
+  semestre: number
+  periodos: PeriodoSemestreDetalle[]
+}
+
+export interface RepitenteCruzadoPeriodo {
+  periodo_id: number
+  periodo_nombre: string
+  semestre_principal: number
+  semestres_donde_repite: number[]
+}
+
+export interface RepitenteCruzado {
+  estudiante_id: string
+  nombre: string
+  periodos: RepitenteCruzadoPeriodo[]
+}
+
+export interface ComparativaResponse {
+  periodos_comparados: ComparativaPeriodoResumen[]
+  detalle_semestres: ComparativaSemestreDetalle[]
+  repitentes_cruzados: RepitenteCruzado[]
+}
+
+export interface TendenciaPeriodo {
+  periodo_id: number
+  periodo_nombre: string
+  total_unicos: number
+  total_repitentes: number
+  fecha_inicio: string | null
+}
+
+export interface TendenciaResponse {
+  periodos: TendenciaPeriodo[]
+}

@@ -7,12 +7,14 @@ import {
   Settings,
   GraduationCap,
   Activity,
+  GitCompareArrows,
 } from 'lucide-react'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/upload', label: 'Cargar Archivo', icon: FileUp },
   { to: '/analisis', label: 'Análisis', icon: BarChart3 },
+  { to: '/comparativa', label: 'Comparativa', icon: GitCompareArrows },
   { to: '/repitentes', label: 'Repitentes', icon: Users },
   { to: '/config', label: 'Configuración', icon: Settings },
 ]

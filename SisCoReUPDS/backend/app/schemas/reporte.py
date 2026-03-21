@@ -52,3 +52,72 @@ class AnalisisCompletoResponse(BaseModel):
     detalle_semestres: list[DetalleSemestreResponse]
     detalle_grupos: list[DetalleGrupoResponse]
     repitentes: list[RepitienteResponse]
+
+
+# --- Comparativa entre Períodos ---
+
+
+class ComparativaPeriodoResumen(BaseModel):
+    periodo_id: int
+    periodo_nombre: str
+    total_unicos: int
+    total_repitentes: int
+
+    model_config = {"from_attributes": True}
+
+
+class PeriodoSemestreDetalle(BaseModel):
+    periodo_id: int
+    periodo_nombre: str
+    unicos: int
+    regulares: int
+    repitentes: int
+
+    model_config = {"from_attributes": True}
+
+
+class ComparativaSemestreDetalle(BaseModel):
+    semestre: int
+    periodos: list[PeriodoSemestreDetalle]
+
+    model_config = {"from_attributes": True}
+
+
+class RepitenteCruzadoPeriodo(BaseModel):
+    periodo_id: int
+    periodo_nombre: str
+    semestre_principal: int
+    semestres_donde_repite: list[int]
+
+    model_config = {"from_attributes": True}
+
+
+class RepitenteCruzado(BaseModel):
+    estudiante_id: str
+    nombre: str
+    periodos: list[RepitenteCruzadoPeriodo]
+
+    model_config = {"from_attributes": True}
+
+
+class ComparativaResponse(BaseModel):
+    periodos_comparados: list[ComparativaPeriodoResumen]
+    detalle_semestres: list[ComparativaSemestreDetalle]
+    repitentes_cruzados: list[RepitenteCruzado]
+
+
+# --- Tendencia (Dashboard) ---
+
+
+class TendenciaPeriodo(BaseModel):
+    periodo_id: int
+    periodo_nombre: str
+    total_unicos: int
+    total_repitentes: int
+    fecha_inicio: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class TendenciaResponse(BaseModel):
+    periodos: list[TendenciaPeriodo]

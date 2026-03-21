@@ -13,6 +13,8 @@ import type {
   DetalleSemestre,
   DetalleGrupo,
   ListasResponse,
+  ComparativaResponse,
+  TendenciaResponse,
 } from '../types'
 
 const api = axios.create({
@@ -142,3 +144,14 @@ export const imprimirListas = (
     link.remove()
     window.URL.revokeObjectURL(url)
   })
+
+// === Comparativas ===
+export const getComparativa = (periodoIds: number[]) =>
+  api.get<ComparativaResponse>('/analisis/comparar', {
+    params: { periodo_ids: periodoIds.join(',') },
+  }).then((r) => r.data)
+
+export const getTendencia = (limite: number = 5) =>
+  api.get<TendenciaResponse>('/analisis/tendencia', {
+    params: { limite },
+  }).then((r) => r.data)

@@ -1,15 +1,27 @@
+from collections import defaultdict
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.models.analisis import Analisis, AnalisisDetalleSemestre, AnalisisDetalleGrupo, Repitente
+from app.models.periodo import Periodo
 from app.schemas.reporte import (
     AnalisisResumenResponse,
     AnalisisCompletoResponse,
     DetalleSemestreResponse,
     DetalleGrupoResponse,
     RepitienteResponse,
+    ComparativaPeriodoResumen,
+    PeriodoSemestreDetalle,
+    ComparativaSemestreDetalle,
+    RepitenteCruzadoPeriodo,
+    RepitenteCruzado,
+    ComparativaResponse,
+    TendenciaPeriodo,
+    TendenciaResponse,
 )
 from app.services.analizador import obtener_configs_grupos
 from app.services.malla_service import obtener_malla_dict
@@ -43,6 +55,204 @@ def listar_analisis(db: Session = Depends(get_db)):
             materias_no_encontradas=a.materias_no_encontradas or [],
         ))
     return resultados
+
+
+# ═══════════════════════════════════════════════════════════
+#  Comparativas entre períodos
+# ═══════════════════════════════════════════════════════════
+
+
+def _ordenar_periodos(periodos: list) -> list:
+    """Ordena períodos por fecha_inicio ASC (nulls last) → nombre ASC → created_at ASC."""
+    def sort_key(p):
+        fecha = p.fecha_inicio if p.fecha_inicio else datetime(9999, 12, 31)
+        return (fecha, p.nombre, p.created_at or datetime(9999, 12, 31))
+    return sorted(periodos, key=sort_key)
+
+
+@router.get("/comparar", response_model=ComparativaResponse)
+def comparar_periodos(
+    periodo_ids: str = Query(..., description="IDs de períodos separados por coma, ej: 1,2,3"),
+    db: Session = Depends(get_db),
+):
+    """Compara análisis entre 2 a 5 períodos."""
+    # Parsear y validar periodo_ids
+    try:
+        ids = [int(x.strip()) for x in periodo_ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status_code=422, detail="periodo_ids debe contener solo números enteros separados por comas.")
+
+    if len(ids) < 2:
+        raise HTTPException(status_code=422, detail="Debe seleccionar al menos 2 períodos para comparar.")
+    if len(ids) > 5:
+        raise HTTPException(status_code=422, detail="No se pueden comparar más de 5 períodos a la vez.")
+
+    # Validar que todos los períodos existen y tienen al menos un análisis
+    periodos = db.query(Periodo).filter(Periodo.id.in_(ids)).all()
+    periodos_por_id = {p.id: p for p in periodos}
+
+    for pid in ids:
+        if pid not in periodos_por_id:
+            raise HTTPException(status_code=404, detail=f"El período con id={pid} no existe.")
+
+    # Para cada período, obtener el análisis más reciente
+    analisis_por_periodo = {}
+    for pid in ids:
+        analisis = (
+            db.query(Analisis)
+            .filter(Analisis.periodo_id == pid)
+            .order_by(Analisis.fecha_analisis.desc(), Analisis.id.desc())
+            .first()
+        )
+        if not analisis:
+            nombre = periodos_por_id[pid].nombre
+            raise HTTPException(
+                status_code=404,
+                detail=f"El período '{nombre}' (id={pid}) no tiene ningún análisis.",
+            )
+        analisis_por_periodo[pid] = analisis
+
+    # Ordenar períodos
+    periodos_ordenados = _ordenar_periodos([periodos_por_id[pid] for pid in ids])
+
+    # 1) periodos_comparados
+    periodos_comparados = []
+    for p in periodos_ordenados:
+        a = analisis_por_periodo[p.id]
+        periodos_comparados.append(ComparativaPeriodoResumen(
+            periodo_id=p.id,
+            periodo_nombre=p.nombre,
+            total_unicos=a.total_unicos,
+            total_repitentes=a.total_repitentes,
+        ))
+
+    # 2) detalle_semestres — alinear por número de semestre
+    # Cargar detalle_semestres para todos los análisis
+    analisis_ids = [analisis_por_periodo[p.id].id for p in periodos_ordenados]
+    detalles = (
+        db.query(AnalisisDetalleSemestre)
+        .filter(AnalisisDetalleSemestre.analisis_id.in_(analisis_ids))
+        .all()
+    )
+
+    # Agrupar: {analisis_id: {semestre: detalle}}
+    detalle_map = {}
+    todos_semestres = set()
+    for d in detalles:
+        detalle_map.setdefault(d.analisis_id, {})[d.semestre] = d
+        todos_semestres.add(d.semestre)
+
+    detalle_semestres_response = []
+    for sem in sorted(todos_semestres):
+        periodo_detalles = []
+        for p in periodos_ordenados:
+            a_id = analisis_por_periodo[p.id].id
+            d = detalle_map.get(a_id, {}).get(sem)
+            if d:
+                periodo_detalles.append(PeriodoSemestreDetalle(
+                    periodo_id=p.id,
+                    periodo_nombre=p.nombre,
+                    unicos=d.unicos,
+                    regulares=d.regulares,
+                    repitentes=d.repitentes,
+                ))
+            else:
+                periodo_detalles.append(PeriodoSemestreDetalle(
+                    periodo_id=p.id,
+                    periodo_nombre=p.nombre,
+                    unicos=0,
+                    regulares=0,
+                    repitentes=0,
+                ))
+        detalle_semestres_response.append(ComparativaSemestreDetalle(
+            semestre=sem,
+            periodos=periodo_detalles,
+        ))
+
+    # 3) repitentes_cruzados — estudiantes que aparecen en 2+ períodos
+    repitentes_db = (
+        db.query(Repitente)
+        .filter(Repitente.analisis_id.in_(analisis_ids))
+        .all()
+    )
+
+    # Mapear analisis_id -> periodo
+    analisis_id_to_periodo = {}
+    for p in periodos_ordenados:
+        analisis_id_to_periodo[analisis_por_periodo[p.id].id] = p
+
+    # Agrupar por estudiante_id
+    estudiante_periodos = defaultdict(list)
+    estudiante_nombre = {}
+    for r in repitentes_db:
+        periodo = analisis_id_to_periodo[r.analisis_id]
+        estudiante_periodos[r.estudiante_id].append(
+            RepitenteCruzadoPeriodo(
+                periodo_id=periodo.id,
+                periodo_nombre=periodo.nombre,
+                semestre_principal=r.semestre_principal,
+                semestres_donde_repite=r.semestres_donde_repite or [],
+            )
+        )
+        estudiante_nombre[r.estudiante_id] = r.nombre
+
+    repitentes_cruzados = []
+    for est_id, periodos_list in estudiante_periodos.items():
+        if len(periodos_list) >= 2:
+            repitentes_cruzados.append(RepitenteCruzado(
+                estudiante_id=est_id,
+                nombre=estudiante_nombre[est_id],
+                periodos=periodos_list,
+            ))
+    repitentes_cruzados.sort(key=lambda x: x.nombre)
+
+    return ComparativaResponse(
+        periodos_comparados=periodos_comparados,
+        detalle_semestres=detalle_semestres_response,
+        repitentes_cruzados=repitentes_cruzados,
+    )
+
+
+@router.get("/tendencia", response_model=TendenciaResponse)
+def tendencia_periodos(
+    limite: int = Query(5, ge=1, le=10, description="Número de períodos recientes a mostrar"),
+    db: Session = Depends(get_db),
+):
+    """Retorna la tendencia de los últimos N períodos con análisis."""
+    # Obtener períodos que tienen al menos un análisis, ordenados
+    periodos_con_analisis = (
+        db.query(Periodo)
+        .filter(Periodo.analisis.any())
+        .all()
+    )
+
+    # Ordenar y limitar
+    periodos_ordenados = _ordenar_periodos(periodos_con_analisis)[-limite:]
+
+    resultado = []
+    for p in periodos_ordenados:
+        # Último análisis del período
+        analisis = (
+            db.query(Analisis)
+            .filter(Analisis.periodo_id == p.id)
+            .order_by(Analisis.fecha_analisis.desc(), Analisis.id.desc())
+            .first()
+        )
+        if analisis:
+            resultado.append(TendenciaPeriodo(
+                periodo_id=p.id,
+                periodo_nombre=p.nombre,
+                total_unicos=analisis.total_unicos,
+                total_repitentes=analisis.total_repitentes,
+                fecha_inicio=p.fecha_inicio.isoformat() if p.fecha_inicio else None,
+            ))
+
+    return TendenciaResponse(periodos=resultado)
+
+
+# ═══════════════════════════════════════════════════════════
+#  Detalle de análisis individual
+# ═══════════════════════════════════════════════════════════
 
 
 @router.get("/{analisis_id}", response_model=AnalisisCompletoResponse)
