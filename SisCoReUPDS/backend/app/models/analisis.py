@@ -17,6 +17,7 @@ class Analisis(Base):
     total_repitentes = Column(Integer, default=0)
     materias_no_encontradas = Column(JSON, nullable=True)
     datos_completos = Column(JSON, nullable=True)
+    datos_por_materia = Column(JSON, nullable=True)
 
     periodo = relationship("Periodo", back_populates="analisis")
     detalle_semestres = relationship("AnalisisDetalleSemestre", back_populates="analisis", cascade="all, delete-orphan")

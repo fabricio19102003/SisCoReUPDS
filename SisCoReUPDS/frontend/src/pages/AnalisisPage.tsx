@@ -17,6 +17,7 @@ import {
   FileText,
   AlertTriangle,
   List,
+  BookOpen,
 } from 'lucide-react'
 
 const CHART_COLORS = {
@@ -197,6 +198,13 @@ function AnalisisDetalle({ id }: { id: number }) {
           >
             <List className="w-3.5 h-3.5" />
             Listas
+          </Link>
+          <Link
+            to={`/analisis/${id}/materias`}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-upds-celeste/10 text-upds-celeste text-xs font-semibold rounded-xl hover:bg-upds-celeste/20 transition-colors"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            Materias
           </Link>
           <button
             onClick={() => exportarAnalisis(id, 'excel')}

@@ -27,7 +27,7 @@ from app.services.analizador import obtener_configs_grupos
 from app.services.malla_service import obtener_malla_dict
 from app.services.parser_excel import procesar_excel
 from app.services.analizador import generar_estadisticas
-from app.services.exportador import exportar_excel, exportar_pdf, exportar_listas_pdf, exportar_repitentes_excel, exportar_repitentes_pdf
+from app.services.exportador import exportar_excel, exportar_pdf, exportar_listas_pdf, exportar_repitentes_excel, exportar_repitentes_pdf, exportar_materias_pdf
 
 router = APIRouter(prefix="/api/analisis", tags=["Reportes y Análisis"])
 
@@ -554,6 +554,159 @@ def _reconstruir_stats(analisis: Analisis, db: Session) -> dict:
         "est_sem_principal": est_sem_principal,
         "est_nombre": est_nombre,
     }
+
+
+# ═══════════════════════════════════════════════════════════
+#  Listas de registrados por materia
+# ═══════════════════════════════════════════════════════════
+
+
+@router.get("/{analisis_id}/materias")
+def obtener_materias(
+    analisis_id: int,
+    semestre: int | None = Query(None),
+    grupo: str | None = Query(None, description="Filtrar por grupo, ej: M1,T2"),
+    buscar: str | None = Query(None, description="Buscar por código o nombre de materia"),
+    db: Session = Depends(get_db),
+):
+    """
+    Retorna las listas de estudiantes por materia, con filtros opcionales.
+    """
+    analisis = _obtener_analisis(analisis_id, db)
+
+    if not analisis.datos_por_materia:
+        raise HTTPException(
+            status_code=404,
+            detail="Este análisis no tiene datos por materia. Re-suba el archivo para generar los datos.",
+        )
+
+    # Parsear grupos seleccionados
+    grupos_seleccionados = None
+    if grupo:
+        grupos_seleccionados = set(g.strip() for g in grupo.split(",") if g.strip())
+
+    resultado = []
+    for entry in analisis.datos_por_materia:
+        if semestre is not None and entry["semestre"] != semestre:
+            continue
+        if grupos_seleccionados is not None and entry["grupo"] not in grupos_seleccionados:
+            continue
+        if buscar:
+            buscar_lower = buscar.lower()
+            if (buscar_lower not in entry["codigo"].lower()
+                    and buscar_lower not in entry["nombre"].lower()):
+                continue
+
+        resultado.append({
+            "codigo": entry["codigo"],
+            "nombre": entry["nombre"],
+            "semestre": entry["semestre"],
+            "letra": entry["letra"],
+            "grupo": entry["grupo"],
+            "total_estudiantes": entry["total_estudiantes"],
+            "estudiantes": entry["estudiantes"],
+        })
+
+    # Filtros disponibles
+    semestres_disponibles = sorted(set(e["semestre"] for e in analisis.datos_por_materia))
+    materias_disponibles = []
+    seen = set()
+    for e in analisis.datos_por_materia:
+        key = e["codigo"]
+        if key not in seen:
+            seen.add(key)
+            materias_disponibles.append({
+                "codigo": e["codigo"],
+                "nombre": e["nombre"],
+                "semestre": e["semestre"],
+            })
+    materias_disponibles.sort(key=lambda x: (x["semestre"], x["codigo"]))
+
+    # Grupos disponibles (únicos, con conteo de materias por grupo)
+    grupos_disponibles = []
+    grupos_seen = {}
+    for e in analisis.datos_por_materia:
+        g = e["grupo"]
+        s = e["semestre"]
+        key = (s, g)
+        if key not in grupos_seen:
+            grupos_seen[key] = {"semestre": s, "grupo": g, "total_materias": 0}
+        grupos_seen[key]["total_materias"] += 1
+    grupos_disponibles = sorted(grupos_seen.values(), key=lambda x: (x["semestre"], x["grupo"]))
+
+    return {
+        "analisis_id": analisis_id,
+        "periodo_nombre": analisis.periodo.nombre if analisis.periodo else None,
+        "archivo_nombre": analisis.archivo_nombre,
+        "filtros_disponibles": {
+            "semestres": semestres_disponibles,
+            "materias": materias_disponibles,
+            "grupos": grupos_disponibles,
+        },
+        "listas": resultado,
+        "total_materias": len(resultado),
+        "total_estudiantes": sum(e["total_estudiantes"] for e in resultado),
+    }
+
+
+@router.get("/{analisis_id}/materias/imprimir")
+def imprimir_materias(
+    analisis_id: int,
+    semestre: int | None = Query(None),
+    grupo: str | None = Query(None, description="Grupos separados por coma, ej: M1,T2"),
+    buscar: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Genera un PDF para impresión de listas de estudiantes por materia.
+    """
+    analisis = _obtener_analisis(analisis_id, db)
+
+    if not analisis.datos_por_materia:
+        raise HTTPException(
+            status_code=404,
+            detail="Este análisis no tiene datos por materia.",
+        )
+
+    grupos_seleccionados = None
+    if grupo:
+        grupos_seleccionados = set(g.strip() for g in grupo.split(",") if g.strip())
+
+    materias_filtradas = []
+    for entry in analisis.datos_por_materia:
+        if semestre is not None and entry["semestre"] != semestre:
+            continue
+        if grupos_seleccionados is not None and entry["grupo"] not in grupos_seleccionados:
+            continue
+        if buscar:
+            buscar_lower = buscar.lower()
+            if (buscar_lower not in entry["codigo"].lower()
+                    and buscar_lower not in entry["nombre"].lower()):
+                continue
+        materias_filtradas.append(entry)
+
+    if not materias_filtradas:
+        raise HTTPException(status_code=404, detail="No se encontraron materias con los filtros aplicados.")
+
+    periodo_nombre = analisis.periodo.nombre if analisis.periodo else "Sin período"
+    output = exportar_materias_pdf(materias_filtradas, periodo_nombre)
+
+    filtro_desc = []
+    if semestre is not None:
+        filtro_desc.append(f"S{semestre}")
+    if grupo:
+        filtro_desc.append(grupo)
+    if buscar:
+        filtro_desc.append(buscar)
+    filtro_str = "_".join(filtro_desc) if filtro_desc else "todas"
+
+    return StreamingResponse(
+        output,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=Materias_{filtro_str}_{analisis.archivo_nombre}.pdf",
+        },
+    )
 
 
 # ═══════════════════════════════════════════════════════════

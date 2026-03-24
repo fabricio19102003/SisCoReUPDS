@@ -13,6 +13,7 @@ import type {
   DetalleSemestre,
   DetalleGrupo,
   ListasResponse,
+  MateriasResponse,
   ComparativaResponse,
   TendenciaResponse,
 } from '../types'
@@ -139,6 +140,31 @@ export const imprimirListas = (
     const link = document.createElement('a')
     link.href = url
     link.setAttribute('download', `listas_analisis_${id}.pdf`)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  })
+
+// === Listas por materia ===
+export const getMaterias = (
+  id: number,
+  params?: { semestre?: number; grupo?: string; buscar?: string }
+) =>
+  api.get<MateriasResponse>(`/analisis/${id}/materias`, { params }).then((r) => r.data)
+
+export const imprimirMaterias = (
+  id: number,
+  params?: { semestre?: number; grupo?: string; buscar?: string }
+) =>
+  api.get(`/analisis/${id}/materias/imprimir`, {
+    params,
+    responseType: 'blob',
+  }).then((r) => {
+    const url = window.URL.createObjectURL(new Blob([r.data], { type: 'application/pdf' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `materias_analisis_${id}.pdf`)
     document.body.appendChild(link)
     link.click()
     link.remove()

@@ -164,6 +164,31 @@ async def subir_y_analizar(
         datos_completos_json.sort(key=lambda x: (x["semestre"], x["grupo"]))
         analisis.datos_completos = datos_completos_json
 
+        # Guardar datos por materia (cada registro = una materia + letra)
+        datos_por_materia_json = []
+        for r in registros:
+            if r["semestre"] is None:
+                continue
+            sem = r["semestre"]
+            letra = r["letra_grupo"]
+            if sem in configs_grupos:
+                letra_a_grupo_map, _, _ = configs_grupos[sem]
+            else:
+                letra_a_grupo_map = {}
+            grupo_real = letra_a_grupo_map.get(letra, letra)
+
+            datos_por_materia_json.append({
+                "codigo": r["codigo_materia"],
+                "nombre": r.get("nombre_malla") or r.get("nombre_materia") or r["codigo_materia"],
+                "semestre": sem,
+                "letra": letra,
+                "grupo": grupo_real,
+                "total_estudiantes": len(r["estudiantes"]),
+                "estudiantes": sorted(r["estudiantes"], key=lambda e: e["nombre"]),
+            })
+        datos_por_materia_json.sort(key=lambda x: (x["semestre"], x["codigo"], x["letra"]))
+        analisis.datos_por_materia = datos_por_materia_json
+
         db.commit()
         db.refresh(analisis)
 

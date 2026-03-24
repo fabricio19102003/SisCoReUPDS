@@ -859,6 +859,190 @@ def exportar_listas_pdf(listas: list[dict], periodo_nombre: str) -> io.BytesIO:
 
 
 # ═══════════════════════════════════════════════════════════
+#  EXPORTAR LISTAS POR MATERIA
+# ═══════════════════════════════════════════════════════════
+
+
+def exportar_materias_pdf(materias: list[dict], periodo_nombre: str) -> io.BytesIO:
+    """
+    Genera un PDF vertical con listas de estudiantes por materia,
+    pensado para impresión. Una página (o más) por materia.
+    """
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+        PageBreak,
+    )
+    from reportlab.lib.units import inch
+    from reportlab.lib.enums import TA_CENTER
+
+    output = io.BytesIO()
+
+    NAVY = colors.HexColor("#0F1D42")
+    NAVY_MID = colors.HexColor("#243A7A")
+    CELESTE = colors.HexColor("#4A90D9")
+    ICE = colors.HexColor("#F7F9FC")
+    FOG = colors.HexColor("#EDF1F7")
+    GRAPHITE = colors.HexColor("#475569")
+
+    doc = SimpleDocTemplate(
+        output,
+        pagesize=letter,
+        leftMargin=0.6 * inch,
+        rightMargin=0.6 * inch,
+        topMargin=1.0 * inch,
+        bottomMargin=0.7 * inch,
+    )
+
+    styles = getSampleStyleSheet()
+
+    styles.add(ParagraphStyle(
+        name="MatTitulo",
+        fontName="Helvetica-Bold",
+        fontSize=13,
+        textColor=NAVY,
+        spaceAfter=2,
+        alignment=TA_CENTER,
+    ))
+    styles.add(ParagraphStyle(
+        name="MatSubtitulo",
+        fontName="Helvetica",
+        fontSize=9,
+        textColor=GRAPHITE,
+        spaceAfter=8,
+        alignment=TA_CENTER,
+    ))
+    styles.add(ParagraphStyle(
+        name="MatGrupoTitulo",
+        fontName="Helvetica-Bold",
+        fontSize=12,
+        textColor=colors.white,
+        backColor=NAVY_MID,
+        borderPadding=(6, 10, 6, 10),
+        spaceAfter=0,
+        spaceBefore=0,
+    ))
+    styles.add(ParagraphStyle(
+        name="MatGrupoInfo",
+        fontName="Helvetica",
+        fontSize=9,
+        textColor=GRAPHITE,
+        spaceAfter=6,
+        spaceBefore=4,
+    ))
+    styles.add(ParagraphStyle(
+        name="MatCeldaTexto",
+        fontName="Helvetica",
+        fontSize=9,
+        leading=11,
+    ))
+
+    avail_width = doc.width
+
+    lista_table_style = [
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, 0), 8),
+        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 1), (-1, -1), 9),
+        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+        ("ALIGN", (0, 1), (0, -1), "CENTER"),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.3, FOG),
+        ("LINEAFTER", (0, 0), (-2, -1), 0.3, FOG),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, ICE]),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+    ]
+
+    story = []
+
+    for idx, materia in enumerate(materias):
+        if idx > 0:
+            story.append(PageBreak())
+
+        sem = materia["semestre"]
+        codigo = materia["codigo"]
+        nombre = materia["nombre"]
+        letra = materia["letra"]
+        grupo = materia["grupo"]
+        estudiantes = materia["estudiantes"]
+
+        story.append(Paragraph(
+            f"LISTA DE REGISTRADOS &mdash; SEMESTRE {sem}",
+            styles["MatTitulo"],
+        ))
+        story.append(Paragraph(
+            f"{periodo_nombre} &bull; Carrera de Medicina &bull; UPDS",
+            styles["MatSubtitulo"],
+        ))
+
+        story.append(Spacer(1, 4))
+
+        story.append(Paragraph(
+            f"{codigo} &mdash; {nombre} (Letra {letra} / Grupo {grupo})",
+            styles["MatGrupoTitulo"],
+        ))
+        story.append(Paragraph(
+            f"Total registrados: {len(estudiantes)}",
+            styles["MatGrupoInfo"],
+        ))
+
+        col_widths = [
+            avail_width * 0.08,
+            avail_width * 0.25,
+            avail_width * 0.47,
+            avail_width * 0.20,
+        ]
+        data = [["N°", "Código", "Nombre Completo", "Firma"]]
+
+        for i, est in enumerate(estudiantes, 1):
+            data.append([
+                str(i),
+                Paragraph(str(est["id"]), styles["MatCeldaTexto"]),
+                Paragraph(est["nombre"], styles["MatCeldaTexto"]),
+                "",
+            ])
+
+        t = Table(data, colWidths=col_widths, repeatRows=1)
+        style_cmds = list(lista_table_style)
+
+        for row_idx in range(1, len(data)):
+            style_cmds.append(
+                ("LINEBELOW", (3, row_idx), (3, row_idx), 0.5, colors.HexColor("#94A3B8"))
+            )
+
+        t.setStyle(TableStyle(style_cmds))
+        story.append(t)
+
+        story.append(Spacer(1, 30))
+        firma_data = [
+            ["", ""],
+            ["_" * 35, "_" * 35],
+            ["Firma del Docente", "Firma del Director"],
+        ]
+        firma_table = Table(firma_data, colWidths=[avail_width * 0.45, avail_width * 0.45])
+        firma_table.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("FONTNAME", (0, 2), (-1, 2), "Helvetica"),
+            ("FONTSIZE", (0, 2), (-1, 2), 8),
+            ("TEXTCOLOR", (0, 2), (-1, 2), GRAPHITE),
+            ("TOPPADDING", (0, 2), (-1, 2), 4),
+        ]))
+        story.append(firma_table)
+
+    doc.build(story, onFirstPage=_header_footer, onLaterPages=_header_footer)
+    output.seek(0)
+    return output
+
+
+# ═══════════════════════════════════════════════════════════
 #  EXPORTAR REPITENTES
 # ═══════════════════════════════════════════════════════════
 

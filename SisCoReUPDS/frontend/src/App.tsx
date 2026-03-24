@@ -6,6 +6,7 @@ import AnalisisPage from './pages/AnalisisPage'
 import ListasPage from './pages/ListasPage'
 import RepitentesPage from './pages/RepitentesPage'
 import ConfigPage from './pages/ConfigPage'
+import MateriasPage from './pages/MateriasPage'
 import ComparativaPage from './pages/ComparativaPage'
 
 export default function App() {
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="/analisis" element={<AnalisisPage />} />
         <Route path="/analisis/:id" element={<AnalisisPage />} />
         <Route path="/analisis/:id/listas" element={<ListasPage />} />
+        <Route path="/analisis/:id/materias" element={<MateriasPage />} />
         <Route path="/comparativa" element={<ComparativaPage />} />
         <Route path="/repitentes" element={<RepitentesPage />} />
         <Route path="/config" element={<ConfigPage />} />

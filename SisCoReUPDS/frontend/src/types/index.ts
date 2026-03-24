@@ -136,6 +136,43 @@ export interface ListasResponse {
   total_estudiantes: number
 }
 
+// === Listas por materia ===
+export interface MateriaDisponible {
+  codigo: string
+  nombre: string
+  semestre: number
+}
+
+export interface GrupoMateriaDisponible {
+  semestre: number
+  grupo: string
+  total_materias: number
+}
+
+export interface ListaMateria {
+  codigo: string
+  nombre: string
+  semestre: number
+  letra: string
+  grupo: string
+  total_estudiantes: number
+  estudiantes: EstudianteLista[]
+}
+
+export interface MateriasResponse {
+  analisis_id: number
+  periodo_nombre: string | null
+  archivo_nombre: string
+  filtros_disponibles: {
+    semestres: number[]
+    materias: MateriaDisponible[]
+    grupos: GrupoMateriaDisponible[]
+  }
+  listas: ListaMateria[]
+  total_materias: number
+  total_estudiantes: number
+}
+
 // === Comparativas ===
 export interface ComparativaPeriodoResumen {
   periodo_id: number
